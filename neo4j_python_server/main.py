@@ -1,23 +1,25 @@
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
+from starlette.middleware.base import BaseHTTPMiddleware
+
 from pydantic import BaseModel
 from typing import Optional
 from neo4j_python_server.database import query_db, can_connect
 from neo4j_python_server.models import Neo4jCredentials
-from neo4j_python_server.conversions import (
-    ConversionConfig,
-    ConversionFormat,
-    convert_schema,
+from neo4j_python_server.export import (
+    ExportConfig,
+    ExportFormat,
+    export_schema,
+    export_nodes,
+    export_relationships,
 )
 from neo4j_python_server.logger import logger
 import json
 import os
 import logging
-from neo4j.graph import Node, Relationship
+from neo4j import exceptions
 
 logger.setLevel(logging.DEBUG)
-
-app = FastAPI()
 
 origins = [
     "http://127.0.0.1:8000",  # Alternative localhost address
@@ -26,6 +28,27 @@ origins = [
     "http://localhost:8080",  # Add other origins as needed
 ]
 
+
+class Neo4jExceptionMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: Request, call_next):
+        try:
+            response = await call_next(request)
+            return response
+        except exceptions.AuthError as e:
+            msg = f"Neo4j Authentication Error: {e}"
+            logger.error(msg)
+            return Response(content=msg, status_code=400)
+        except exceptions.ServiceUnavailable as e:
+            msg = f"Neo4j Database Unavailable Error: {e}"
+            logger.error(msg)
+            return Response(content=msg, status_code=400)
+        except Exception as e:
+            logger.error(e)
+            return Response(content=str(e), status_code=400)
+
+
+app = FastAPI()
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=origins,
@@ -33,6 +56,8 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+app.add_middleware(Neo4jExceptionMiddleware)
+
 
 default_creds = Neo4jCredentials(
     uri=os.environ.get("NEO4J_URI", "bolt://localhost:7687"),
@@ -43,10 +68,7 @@ default_creds = Neo4jCredentials(
 
 
 @app.post("/validate")
-async def check_database_connection(creds: Optional[Neo4jCredentials] = None):
-
-    if creds is None:
-        creds = default_creds
+async def check_database_connection(creds: Optional[Neo4jCredentials] = default_creds):
 
     success, msg = can_connect(creds)
     if success:
@@ -58,7 +80,7 @@ async def check_database_connection(creds: Optional[Neo4jCredentials] = None):
 @app.post("/schema/")
 def get_schema(
     creds: Optional[Neo4jCredentials] = default_creds,
-    config: Optional[ConversionConfig] = ConversionConfig(),
+    config: Optional[ExportConfig] = ExportConfig(),
 ):
     """Return a data model for a specified Neo4j instance."""
 
@@ -69,7 +91,7 @@ def get_schema(
 
     logger.debug(f"get data model records: {records}")
 
-    converted_records = convert_schema(records, config)
+    converted_records = export_schema(records, config)
 
     return converted_records
 
@@ -88,7 +110,12 @@ def get_node_labels(creds: Optional[Neo4jCredentials] = default_creds) -> list[s
     query = """
         call db.labels();
     """
-    response, _, _ = query_db(creds, query)
+    try:
+        response, _, _ = query_db(creds, query)
+    except Exception as e:
+        msg = f"Error getting node labels: {e}"
+        logger.error(msg)
+        return msg, 400
 
     logger.debug(f"get node labels response: {response}")
 
@@ -99,26 +126,11 @@ def get_node_labels(creds: Optional[Neo4jCredentials] = default_creds) -> list[s
 
 
 @app.post("/nodes/")
-# NOTE: For some reason Pydantic is not parsing payload data correctly, so using older data parsing method with limited validation.
-# async def get_nodes(
-#     creds: Neo4jCredentials,
-#     labels: Optional[list[str]] = None,
-# ):
-async def get_nodes(request: Request):
-
-    try:
-        # Attempt to parse the incoming JSON data
-        parsed_data = await request.json()
-    except json.JSONDecodeError as e:
-        # Log the raw data when a JSON decode error occurs
-        print(f"JSON decode error: {e}")
-        return {"message": "JSON decode error", "error": str(e)}, 400
-
-    labels = parsed_data["labels"] if "labels" in parsed_data else []
-    creds = Neo4jCredentials(**parsed_data["creds"])
-
-    # @app.post("/nodes/")
-    # def get_nodes(creds: Neo4jCredentials, labels: list[str] = []):
+def get_nodes(
+    creds: Optional[Neo4jCredentials] = default_creds,
+    labels: Optional[list[str]] = [],
+    config: Optional[ExportConfig] = ExportConfig(),
+):
 
     if labels is not None and len(labels) > 0:
         query = """
@@ -136,16 +148,7 @@ async def get_nodes(request: Request):
 
     records, summary, key = query_db(creds, query, params)
 
-    result = [
-        {
-            "data": {
-                "id": r.values()[0]._element_id,
-                "label": list(r.values()[0]._labels)[0],
-                "neo4j_data": r.data()["n"],
-            }
-        }
-        for r in records
-    ]
+    result = export_nodes(records, config)
 
     logger.debug(f"{len(result)} results found")
     if len(result) > 0:
@@ -199,13 +202,12 @@ def get_relationship_types(creds: Neo4jCredentials) -> list[str]:
 
 
 @app.post("/relationships/")
-# NOTE: For some reason this doesn't parse correctly
-# async def get_relationships(
-#     creds: Neo4jCredentials,
-#     labels: Optional[list[str]] = None,
-#     types: Optional[list[str]] = None,
-# ):
-async def get_relationships(request: Request):
+def get_relationships(
+    creds: Neo4jCredentials,
+    labels: Optional[list[str]] = None,
+    types: Optional[list[str]] = None,
+    config: ExportConfig = ExportConfig(),
+):
     """Return a list of Relationships from a Neo4j instance.
 
     Args:
@@ -216,19 +218,6 @@ async def get_relationships(request: Request):
     Returns:
         list[Relationship]: List of Relationships formatted for Cytoscape
     """
-
-    # Using old school data parsing
-    try:
-        # Attempt to parse the incoming JSON data
-        parsed_data = await request.json()
-    except json.JSONDecodeError as e:
-        # Log the raw data when a JSON decode error occurs
-        print(f"JSON decode error: {e}")
-        return {"message": "JSON decode error", "error": str(e)}, 400
-
-    types = parsed_data["types"] if "types" in parsed_data else []
-    labels = parsed_data["labels"] if "labels" in parsed_data else []
-    creds = Neo4jCredentials(**parsed_data["creds"])
 
     # Dynamically construct Cypher query dependent on optional Node Labels and Relationship Types.
 
@@ -256,25 +245,7 @@ async def get_relationships(request: Request):
     # Query target db for data
     records, summary, keys = query_db(creds, query, params)
 
-    # Reformat for Cytoscape
-    result = []
-    for r in records:
-        source_id = r.values()[0]._element_id
-        rid = r.values()[1]._element_id
-        target_id = r.values()[2]._element_id
-        r_label = r.data()["r"][1]
-
-        result.append(
-            {
-                "data": {
-                    "source": source_id,
-                    "target": target_id,
-                    "id": rid,
-                    "label": r_label,
-                    "neo4j_data": r.data(),
-                }
-            }
-        )
+    result = export_relationships(records, config)
 
     # Debug return results
     logger.debug(f"{len(result)} results found")
