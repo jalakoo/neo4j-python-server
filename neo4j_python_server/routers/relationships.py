@@ -1,8 +1,6 @@
-from fastapi import APIRouter, Request, Response
-from neo4j_python_server.config import default_creds
+from fastapi import APIRouter, Request, Response, Body
 from neo4j_python_server.database import query_db, can_connect
 from neo4j_python_server.export import (
-    ExportConfig,
     ExportFormat,
     export_schema,
     export_nodes,
@@ -21,7 +19,9 @@ router = APIRouter(
 
 
 @router.post("/types/")
-def get_relationship_types(creds: Neo4jCredentials) -> list[str]:
+def get_relationship_types(
+    creds: Optional[Neo4jCredentials] = Neo4jCredentials(),
+) -> list[str]:
     """Return a list of Relationship types from a Neo4j instance.
 
     Args:
@@ -46,19 +46,21 @@ def get_relationship_types(creds: Neo4jCredentials) -> list[str]:
 
 @router.post("/")
 def get_relationships(
-    creds: Neo4jCredentials,
-    labels: Optional[list[str]] = None,
-    types: Optional[list[str]] = None,
-    config: ExportConfig = ExportConfig(),
+    creds: Optional[Neo4jCredentials] = Neo4jCredentials(),
+    nodes: Optional[list[str]] = None,
+    relationships: Optional[list[str]] = None,
+    export_format: Optional[str] = Body(...),
 ):
     """Return a list of Relationships from a Neo4j instance.
 
     Args:
         creds (Neo4jCredential): Credentials object for Neo4j instance to get Relationships from.
 
-        labels (list[str], optional): List of Node labels to filter by. Defaults to [].
+        nodes (list[str], optional): List of Node labels to filter by. Defaults to [].
 
-        types (list[str], optional): List of Relationship types to filter by. Defaults to [].
+        relationships (list[str], optional): List of Relationship types to filter by. Defaults to [].
+
+        export_format (str, optional): Format to export data in. Options are "cytoscape" , "d3", and "default". Defaults to "default".
 
     Returns:
         list[Relationship]: List of Relationships formatted for Cytoscape
@@ -66,7 +68,12 @@ def get_relationships(
 
     # Dynamically construct Cypher query dependent on optional Node Labels and Relationship Types.
 
-    # TODO: Do this is in a less confusing manner
+    logger.info(f"Nodes recieved: {nodes}")
+    logger.info(f"Format recieved: {export_format}")
+
+    # String enums can't be passed to the Body decorator, so we'll convert them to strings here.
+    if export_format is None:
+        export_format = ExportFormat.DEFAULT
 
     query = f"""
     MATCH (n)-[r]->(n2)
@@ -74,28 +81,30 @@ def get_relationships(
     params = {}
 
     # Add label filtering
-    if labels is not None and len(labels) > 0:
+    if nodes is not None and len(nodes) > 0:
         query += "\nWHERE any(label IN labels(n) WHERE label IN $labels) \nAND any(label IN labels(n2) WHERE label IN $labels)"
-        params = {"labels": labels}
-        if types is not None and len(types) > 0:
-            query += "\nAND type(r) in $types"
-            params["types"] = types
+        params = {"labels": nodes}
+        if relationships is not None and len(relationships) > 0:
+            query += "\nAND type(r) in $relationships"
+            params["relationships"] = relationships
 
-    elif types is not None and len(types) > 0:
-        query += "\nWHERE type(r) in $types"
-        params["types"] = types
+    elif relationships is not None and len(relationships) > 0:
+        query += "\nWHERE type(r) in $relationships"
+        params["relationships"] = relationships
 
     query += "\nRETURN n, r, n2"
 
     # Query target db for data
     records, summary, keys = query_db(creds, query, params)
 
-    result = export_relationships(records, config)
+    result = export_relationships(records, export_format)
+
+    logger.debug(f"result: {result}")
 
     # Debug return results
-    logger.debug(f"{len(result)} results found")
-    if len(result) > 0:
-        logger.debug(f"First result: {result[0]}")
+    # logger.debug(f"{len(result)} results found")
+    # if len(result) > 0:
+    #     logger.debug(f"First result: {result[0]}")
 
     return result
 

@@ -1,31 +1,30 @@
-from fastapi import FastAPI, Request, Response
+from fastapi import FastAPI, Request, Response, Body
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from starlette.middleware.base import BaseHTTPMiddleware
 
 from pydantic import BaseModel
 from typing import Optional
-from neo4j_python_server.config import default_creds
 from neo4j_python_server.database import query_db, can_connect
 from neo4j_python_server.models import Neo4jCredentials
-from neo4j_python_server.export import (
-    ExportConfig,
-    ExportFormat,
-    export_schema,
-)
+from neo4j_python_server.export import ExportFormat, export_schema, export_composite
 from neo4j_python_server.logger import logger
 import json
 import os
 import logging
 from neo4j import exceptions
-from .routers import nodes, relationships
+from .routers import nodes as nodes_router
+from .routers import relationships as relationships_router
 
 logger.setLevel(logging.DEBUG)
 
 origins = [
-    "http://127.0.0.1:8000",  # Alternative localhost address
+    "http://127.0.0.1:8000",  # Alternative localhost address,
+    "http://127.0.0.1:8080",  # Alternative localhost address
     "http://localhost",
     "http://localhost:8000",
-    "http://localhost:8080",  # Add other origins as needed
+    "http://localhost:8080",
+    "*",
 ]
 
 
@@ -58,12 +57,14 @@ app.add_middleware(
 )
 app.add_middleware(Neo4jExceptionMiddleware)
 
-app.include_router(nodes.router)
-app.include_router(relationships.router)
+app.include_router(nodes_router.router)
+app.include_router(relationships_router.router)
 
 
 @app.post("/validate")
-async def check_database_connection(creds: Optional[Neo4jCredentials] = default_creds):
+async def check_database_connection(
+    creds: Optional[Neo4jCredentials] = Neo4jCredentials(),
+):
 
     success, msg = can_connect(creds)
     if success:
@@ -74,10 +75,14 @@ async def check_database_connection(creds: Optional[Neo4jCredentials] = default_
 
 @app.post("/schema/")
 def get_schema(
-    creds: Optional[Neo4jCredentials] = default_creds,
-    config: Optional[ExportConfig] = ExportConfig(),
+    creds: Optional[Neo4jCredentials] = Neo4jCredentials(),
+    export_format: Optional[ExportFormat] = ExportFormat.DEFAULT,
 ):
     """Return a data model for a specified Neo4j instance."""
+
+    logger.info(
+        f"Getting data model for Neo4j instance at {creds.uri}, {creds.username}, {creds.password}"
+    )
 
     query = """
         call db.schema.visualization
@@ -86,6 +91,6 @@ def get_schema(
 
     logger.debug(f"get data model records: {records}")
 
-    converted_records = export_schema(records, config)
+    converted_records = export_schema(records, export_format)
 
     return converted_records

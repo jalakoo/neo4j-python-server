@@ -1,11 +1,9 @@
-from neo4j_python_server.config import default_creds
 from neo4j_python_server.database import query_db, can_connect
 from neo4j_python_server.logger import logger
-from neo4j_python_server.models import Neo4jCredentials
+from neo4j_python_server.models import Neo4jCredentials, Node
 from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException
 from neo4j_python_server.export import (
-    ExportConfig,
     ExportFormat,
     export_schema,
     export_nodes,
@@ -21,7 +19,9 @@ router = APIRouter(
 
 
 @router.post("/labels/", tags=["Nodes"])
-def get_node_labels(creds: Optional[Neo4jCredentials] = default_creds) -> list[str]:
+def get_node_labels(
+    creds: Optional[Neo4jCredentials] = Neo4jCredentials(),
+) -> list[str]:
     """Return a list of Node labels from a specified Neo4j instance.
 
     Args:
@@ -51,9 +51,9 @@ def get_node_labels(creds: Optional[Neo4jCredentials] = default_creds) -> list[s
 
 @router.post("/nodes/", tags=["Nodes"])
 def get_nodes(
-    creds: Optional[Neo4jCredentials] = default_creds,
+    creds: Optional[Neo4jCredentials] = Neo4jCredentials(),
     labels: Optional[list[str]] = [],
-    config: Optional[ExportConfig] = ExportConfig(),
+    export_format: Optional[ExportFormat] = ExportFormat.DEFAULT,
 ):
 
     if labels is not None and len(labels) > 0:
@@ -72,7 +72,7 @@ def get_nodes(
 
     records, summary, key = query_db(creds, query, params)
 
-    result = export_nodes(records, config)
+    result = export_nodes(records, export_format)
 
     logger.debug(f"{len(result)} results found")
     if len(result) > 0:
@@ -81,20 +81,30 @@ def get_nodes(
     return result
 
 
-# @router.post("/nodes/new",  tags=["Nodes"])
-# def create_node(creds: Neo4jCredentials, node_data: dict):
+# @router.post("/new", tags=["Nodes"])
+# def create_node(
+#     creds: Neo4jCredentials,
+#     nodes: list[Node],
+#     export_config: ExportConfig,
+# ):
+
+#     # TODO: Split by labels
+#     nodes_dict_list = [n.model_dump() for n in nodes]
+
 #     # Process the node data and create a new node
-#     label = node_data["label"]
-#     id = node_data["id"]
 #     query = f"""
+#     WITH $nodes as node_data
+#     UNWIND node_data as node
 #     MERGE (n:`{label})
-#     SET n.id = $id
-#     RETURN n.id as id, label(n) as label
+#     SET n = $props
+#     RETURN n
 #     """
 #     params = {
-#         "id": id,
+#         "nodes": nodes_dict_list,
 #     }
 #     records, summary, keys = query_db(creds, query, params)
+
+#     export_records = export_nodes(records, export_config)
 
 #     logger.info(f"Add nodes summary: {summary}")
 
