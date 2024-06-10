@@ -8,9 +8,9 @@ readme = "README.md"
 [tool.poetry.dependencies]
 python = "^3.12"
 fastapi = "^0.111.0"
-neo4j = "^5.20.0"
 pydantic = "^2.7.1"
 uvicorn = "^0.29.0"
+neo4j-rust-ext = "^5.20.0.0"
 
 
 [build-system]
