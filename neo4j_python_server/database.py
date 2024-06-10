@@ -50,13 +50,7 @@ def can_connect(creds: Neo4jCredentials) -> (bool, str):
 
 
 def query_db(creds: Neo4jCredentials, query: str, params: dict = {}):
-    try:
-        with GraphDatabase.driver(
-            creds.uri, auth=basic_auth(creds.username, creds.password)
-        ) as driver:
-            return driver.execute_query(query, params, database=creds.database)
-    except Exception as e:
-        logger.error(
-            f"Problem running query: {query} with params: {params}. ERROR: {e}"
-        )
-        raise e
+    with GraphDatabase.driver(
+        creds.uri, auth=basic_auth(creds.username, creds.password)
+    ) as driver:
+        return driver.execute_query(query, params, database=creds.database)
