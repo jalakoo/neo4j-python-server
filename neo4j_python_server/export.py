@@ -2,6 +2,7 @@ from pydantic import BaseModel
 from enum import Enum
 from neo4j_python_server.logger import logger
 
+
 class ExportFormat(str, Enum):
     CYTOSCAPE = "cytoscape"
     D3 = "d3"
@@ -99,6 +100,7 @@ def export_schema_cytoscape(records: list[any]) -> dict:
     logger.info(f"Returning schema result: {converted_elements}")
     return converted_elements
 
+
 def export_schema_d3(records: list[any]) -> dict:
 
     datamodel = records[0]
@@ -107,29 +109,27 @@ def export_schema_d3(records: list[any]) -> dict:
 
     converted_nodes = [
         {
-                "id": n.element_id,
-                "label": list(n.labels)[0],
-                "properties": n._properties,
+            "id": n.element_id,
+            "label": list(n.labels)[0],
+            "properties": n._properties,
         }
         for n in nodes
     ]
 
     converted_rels = [
         {
-                "source": r.start_node.element_id,
-                "target": r.end_node.element_id,
-                "id": f"{r.element_id}r",
-                "label": r.type,
-                "properties": r._properties,
+            "source": r.start_node.element_id,
+            "target": r.end_node.element_id,
+            "id": f"{r.element_id}r",
+            "label": r.type,
+            "properties": r._properties,
         }
         for r in relationships
     ]
-    converted_elements = {
-        "nodes": converted_nodes,
-        "links": converted_rels
-    }
+    converted_elements = {"nodes": converted_nodes, "links": converted_rels}
     logger.info(f"Returning schema for d3 result: {converted_elements}")
     return converted_elements
+
 
 def export_schema(
     records: list[any],
@@ -158,26 +158,27 @@ def export_nodes_cytoscape(records: list[any]) -> list[dict]:
     result = []
     for n in records:
         labels = [x for x in n.values()[0]._labels]
-        logger.debug(f'labels: {labels}')
+        logger.debug(f"labels: {labels}")
         if len(labels) == 0:
             logger.info(f"Skipping Node with no label: {n}")
             continue
         result.append(
             {
-                "data":{
+                "data": {
                     "id": n.values()[0]._element_id,
                     "label": labels[0],
-                    "properties":n.values()[0]._properties
+                    "properties": n.values()[0]._properties,
                 }
             }
         )
     return result
 
+
 def export_nodes_d3(records: list[any]) -> list[dict]:
     result = []
     for n in records:
         labels = [x for x in n.values()[0]._labels]
-        logger.debug(f'labels: {labels}')
+        logger.debug(f"labels: {labels}")
         if len(labels) == 0:
             logger.info(f"Skipping Node with no label: {n}")
             continue
@@ -185,18 +186,19 @@ def export_nodes_d3(records: list[any]) -> list[dict]:
             {
                 "id": n.values()[0]._element_id,
                 "label": labels[0],
-                "properties":n.values()[0]._properties
+                "properties": n.values()[0]._properties,
             }
         )
-    return {
-        "nodes": result
-    }
+    return {"nodes": result}
+
 
 def export_nodes(
     records: list[any],
     format: ExportFormat,
 ) -> dict | list[dict]:
-    logger.debug(f"exporting nodes for format '{format}'. Number of records: {len(records)}. First record: {records[0] if len(records) > 0 else ""}")
+    logger.debug(
+        f"exporting nodes for format '{format}'. Number of records: {len(records)}. First record: {records[0] if len(records) > 0 else ''}"
+    )
     if format == ExportFormat.CYTOSCAPE:
         return export_nodes_cytoscape(records)
     elif format == ExportFormat.D3:
@@ -271,6 +273,7 @@ def export_cytoscape_relationships(records: list[any]) -> list[dict]:
             f"Could not convert relationships to Cytoscape format. First record for references: {records[0]}"
         )
 
+
 def export_d3_relationships(records: list[any]) -> list[dict]:
     nodes = []
     links = []
@@ -299,13 +302,15 @@ def export_d3_relationships(records: list[any]) -> list[dict]:
             nodes_dict[source_node_data["id"]] = source_node_data
             nodes_dict[target_node_data["id"]] = target_node_data
 
-            links.append({
-                "source": r.values()[0]._element_id,
-                "target": r.values()[2]._element_id,
-                "id": r.values()[1]._element_id,
-                "label": r.data()["r"][1],
-                "properties": r.data(),
-            })
+            links.append(
+                {
+                    "source": r.values()[0]._element_id,
+                    "target": r.values()[2]._element_id,
+                    "id": r.values()[1]._element_id,
+                    "label": r.data()["r"][1],
+                    "properties": r.data(),
+                }
+            )
 
         except Exception as e:
             logger.error(
@@ -319,18 +324,17 @@ def export_d3_relationships(records: list[any]) -> list[dict]:
 
     logger.debug(f"nodes: {nodes}")
 
-    return {
-        "nodes":nodes,
-        "links":links
-    }
+    return {"nodes": nodes, "links": links}
 
 
 def export_relationships(
     records: list[any],
     format: ExportFormat,
 ) -> dict | list[dict]:
-    
-    logger.debug(f"exporting relationships. Number of records: {len(records)}. First record: {records[0] if len(records) > 0 else ""}. Format: {format}")
+
+    logger.debug(
+        f"exporting relationships. Number of records: {len(records)}. First record: {records[0] if len(records) > 0 else ''}. Format: {format}"
+    )
 
     if format == ExportFormat.CYTOSCAPE:
         return export_cytoscape_relationships(records)
@@ -345,7 +349,7 @@ def export_composite(
     relationship_records: list[any],
     export_format: ExportFormat = ExportFormat.DEFAULT,
 ):
-    
+
     # logger.debug(f"exporting composite data. Number of nodes: {len(node_records)}. relationships: {len(relationship_records)}")
 
     if export_format == ExportFormat.CYTOSCAPE:
