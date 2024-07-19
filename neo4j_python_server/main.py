@@ -70,8 +70,8 @@ async def check_database_connection(
 
 @app.post("/schema/")
 def get_schema(
-    creds: Optional[Neo4jCredentials] = Neo4jCredentials(),
     export_format: Optional[ExportFormat] = ExportFormat.DEFAULT,
+    creds: Optional[Neo4jCredentials] = Neo4jCredentials(),
 ):
     """Return a data model for a specified Neo4j instance."""
 

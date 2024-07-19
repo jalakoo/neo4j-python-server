@@ -51,9 +51,9 @@ def get_node_labels(
 
 @router.post("/nodes/", tags=["Nodes"])
 def get_nodes(
-    creds: Optional[Neo4jCredentials] = Neo4jCredentials(),
     labels: Optional[list[str]] = [],
     export_format: Optional[ExportFormat] = ExportFormat.DEFAULT,
+    creds: Optional[Neo4jCredentials] = Neo4jCredentials(),
 ):
 
     if labels is not None and len(labels) > 0:
@@ -82,13 +82,16 @@ def get_nodes(
 
 
 # @router.post("/new", tags=["Nodes"])
-# def create_node(
-#     creds: Neo4jCredentials,
+# def create_nodes(
 #     nodes: list[Node],
 #     export_config: ExportConfig,
+#     creds: Optional[Neo4jCredentials] = Neo4jDefaultCredentials(),
 # ):
 
 #     # TODO: Split by labels
+#     pass
+
+
 #     nodes_dict_list = [n.model_dump() for n in nodes]
 
 #     # Process the node data and create a new node

@@ -46,10 +46,10 @@ def get_relationship_types(
 
 @router.post("/")
 def get_relationships(
-    creds: Optional[Neo4jCredentials] = Neo4jCredentials(),
     nodes: Optional[list[str]] = None,
     relationships: Optional[list[str]] = None,
     export_format: Optional[str] = Body(...),
+    creds: Optional[Neo4jCredentials] = Neo4jCredentials(),
 ):
     """Return a list of Relationships from a Neo4j instance.
 
