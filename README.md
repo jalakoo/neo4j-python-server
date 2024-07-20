@@ -14,3 +14,23 @@ Interactive docs should now be located at:
 ```
 http://localhost:8000/docs
 ```
+
+## Data Schema
+
+Adding Nodes:
+
+```
+{
+    "records": [
+        {
+            "name": "chicken"
+        },
+        {
+            "name":"fish"
+        }
+    ],
+    "labels": [
+        "Animals"
+    ]
+}
+```

@@ -46,8 +46,8 @@ def get_relationship_types(
 
 @router.post("/")
 def get_relationships(
-    nodes: Optional[list[str]] = None,
-    relationships: Optional[list[str]] = None,
+    node_labels: Optional[list[str]] = None,
+    relationship_types: Optional[list[str]] = None,
     export_format: Optional[str] = Body(...),
     creds: Optional[Neo4jCredentials] = Neo4jCredentials(),
 ):
@@ -68,7 +68,7 @@ def get_relationships(
 
     # Dynamically construct Cypher query dependent on optional Node Labels and Relationship Types.
 
-    logger.info(f"Nodes recieved: {nodes}")
+    logger.info(f"Nodes recieved: {node_labels}")
     logger.info(f"Format recieved: {export_format}")
 
     # String enums can't be passed to the Body decorator, so we'll convert them to strings here.
@@ -81,16 +81,16 @@ def get_relationships(
     params = {}
 
     # Add label filtering
-    if nodes is not None and len(nodes) > 0:
+    if node_labels is not None and len(node_labels) > 0:
         query += "\nWHERE any(label IN labels(n) WHERE label IN $labels) \nAND any(label IN labels(n2) WHERE label IN $labels)"
-        params = {"labels": nodes}
-        if relationships is not None and len(relationships) > 0:
+        params = {"labels": node_labels}
+        if relationship_types is not None and len(relationship_types) > 0:
             query += "\nAND type(r) in $relationships"
-            params["relationships"] = relationships
+            params["relationships"] = relationship_types
 
-    elif relationships is not None and len(relationships) > 0:
+    elif relationship_types is not None and len(relationship_types) > 0:
         query += "\nWHERE type(r) in $relationships"
-        params["relationships"] = relationships
+        params["relationships"] = relationship_types
 
     query += "\nRETURN n, r, n2"
 

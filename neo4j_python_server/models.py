@@ -11,15 +11,9 @@ class Neo4jCredentials(BaseModel):
 
 
 class Node(BaseModel):
-    labels: list[str]
+    labels: Optional[list[str]] = []
     element_id: Optional[str] = None
     properties: dict = None
-
-    @field_validator("labels", mode="before")
-    def labels_must_have_at_least_one_item(cls, labels):
-        if not labels:
-            raise ValueError("labels must have at least one item")
-        return labels
 
 
 class Relationship(BaseModel):

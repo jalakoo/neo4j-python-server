@@ -1,6 +1,8 @@
 from neo4j_python_server.database import query_db, can_connect
 from neo4j_python_server.logger import logger
 from neo4j_python_server.models import Neo4jCredentials, Node
+from neo4j_python_server.ingest import ImportFormat, import_nodes_query
+from neo4j_python_server.utils import dict_to_cypher
 from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException
 from neo4j_python_server.export import (
@@ -49,7 +51,7 @@ def get_node_labels(
     return result
 
 
-@router.post("/nodes/", tags=["Nodes"])
+@router.post("/")
 def get_nodes(
     labels: Optional[list[str]] = [],
     export_format: Optional[ExportFormat] = ExportFormat.DEFAULT,
@@ -81,34 +83,21 @@ def get_nodes(
     return result
 
 
-# @router.post("/new", tags=["Nodes"])
-# def create_nodes(
-#     nodes: list[Node],
-#     export_config: ExportConfig,
-#     creds: Optional[Neo4jCredentials] = Neo4jDefaultCredentials(),
-# ):
+@router.post("/add")
+def create_nodes(
+    records: list[dict],
+    labels: list[str],
+    key: Optional[str],
+    import_format: Optional[ImportFormat] = ImportFormat.DEFAULT,
+    creds: Optional[Neo4jCredentials] = Neo4jCredentials(),
+):
 
-#     # TODO: Split by labels
-#     pass
+    # TODO: Why is key coming in as None when present in payload
+    print(f"key received: {key}")
 
+    query, params = import_nodes_query(records, labels, key, import_format)
 
-#     nodes_dict_list = [n.model_dump() for n in nodes]
+    records, summary, keys = query_db(creds, query, params)
+    logger.info(f"Add nodes summary: {summary.__dict__}")
 
-#     # Process the node data and create a new node
-#     query = f"""
-#     WITH $nodes as node_data
-#     UNWIND node_data as node
-#     MERGE (n:`{label})
-#     SET n = $props
-#     RETURN n
-#     """
-#     params = {
-#         "nodes": nodes_dict_list,
-#     }
-#     records, summary, keys = query_db(creds, query, params)
-
-#     export_records = export_nodes(records, export_config)
-
-#     logger.info(f"Add nodes summary: {summary}")
-
-#     return {"message": "New node created", "summary": summary}
+    return {"message": "New node created", "summary": summary}
