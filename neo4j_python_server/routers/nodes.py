@@ -2,9 +2,8 @@ from neo4j_python_server.database import query_db, can_connect
 from neo4j_python_server.logger import logger
 from neo4j_python_server.models import Neo4jCredentials, Node
 from neo4j_python_server.ingest import ImportFormat, import_nodes_query
-from neo4j_python_server.utils import dict_to_cypher
 from typing import Optional
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Body
 from neo4j_python_server.export import (
     ExportFormat,
     export_schema,
@@ -54,7 +53,7 @@ def get_node_labels(
 @router.post("/")
 def get_nodes(
     labels: Optional[list[str]] = [],
-    export_format: Optional[ExportFormat] = ExportFormat.DEFAULT,
+    export_format: Optional[ExportFormat] = Body(default=ExportFormat.DEFAULT),
     creds: Optional[Neo4jCredentials] = Neo4jCredentials(),
 ):
 
@@ -88,7 +87,7 @@ def create_nodes(
     records: list[dict],
     labels: list[str],
     key: Optional[str],
-    import_format: Optional[ImportFormat] = ImportFormat.DEFAULT,
+    import_format: Optional[ImportFormat] = Body(default=ImportFormat.DEFAULT),
     creds: Optional[Neo4jCredentials] = Neo4jCredentials(),
 ):
 

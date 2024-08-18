@@ -85,7 +85,7 @@ def export_schema_cytoscape(records: list[any]) -> dict:
                 "data": {
                     "source": r.start_node.element_id,
                     "target": r.end_node.element_id,
-                    "id": f"{r.element_id}r",
+                    "id": r.element_id,
                     "label": r.type,
                     "properties": r._properties,
                 }
@@ -120,7 +120,7 @@ def export_schema_d3(records: list[any]) -> dict:
         {
             "source": r.start_node.element_id,
             "target": r.end_node.element_id,
-            "id": f"{r.element_id}r",
+            "id": {r.element_id},
             "label": r.type,
             "properties": r._properties,
         }

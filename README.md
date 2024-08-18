@@ -17,6 +17,10 @@ http://localhost:8000/docs
 
 ## Data Schema
 
+### Default
+
+Matches schema used by the [neo4j-uploader]() package
+
 Adding Nodes:
 
 ```
@@ -34,3 +38,34 @@ Adding Nodes:
     ]
 }
 ```
+
+Adding Relationships:
+
+```
+    {
+        "type":"LOVES",
+        "from_node": {
+            "record_key":"_from_uid",
+            "node_key":"uid",
+            "node_label":"Person"
+        },
+        "to_node": {
+            "record_key":"_to_gid",
+            "node_key":"gid",
+            "node_label": "Dog"
+        },
+        "exclude_keys":["_from_uid", "_to_gid"],
+        "records":[
+            {
+                "_from_uid":"abc",
+                "_to_gid":"abc"
+            }
+        ]
+    }
+```
+
+### Cytoscape
+
+### D3
+
+### NetworkX

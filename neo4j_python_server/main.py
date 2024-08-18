@@ -9,14 +9,10 @@ from neo4j_python_server.database import query_db, can_connect
 from neo4j_python_server.models import Neo4jCredentials
 from neo4j_python_server.export import ExportFormat, export_schema, export_composite
 from neo4j_python_server.logger import logger
-import json
 import os
-import logging
 from neo4j import exceptions
 from .routers import nodes as nodes_router
 from .routers import relationships as relationships_router
-
-logger.setLevel(logging.DEBUG)
 
 origins = [
     os.getenv("FRONTEND_URL"),
@@ -70,13 +66,13 @@ async def check_database_connection(
 
 @app.post("/schema/")
 def get_schema(
-    export_format: Optional[ExportFormat] = ExportFormat.DEFAULT,
+    export_format: Optional[ExportFormat] = Body(default=ExportFormat.DEFAULT),
     creds: Optional[Neo4jCredentials] = Neo4jCredentials(),
 ):
     """Return a data model for a specified Neo4j instance."""
 
     logger.info(
-        f"Getting data model for Neo4j instance at {creds.uri}, {creds.username}, {creds.password}"
+        f"Getting data model for Neo4j instance at {creds.uri}, export format: {export_format}"
     )
 
     query = """
@@ -87,5 +83,7 @@ def get_schema(
     logger.debug(f"get data model records: {records}")
 
     converted_records = export_schema(records, export_format)
+
+    logger.debug(f"Returning converted schema records: {converted_records}")
 
     return converted_records

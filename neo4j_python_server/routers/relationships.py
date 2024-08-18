@@ -48,7 +48,7 @@ def get_relationship_types(
 def get_relationships(
     node_labels: Optional[list[str]] = None,
     relationship_types: Optional[list[str]] = None,
-    export_format: Optional[str] = Body(...),
+    export_format: Optional[str] = Body(default=ExportFormat.DEFAULT),
     creds: Optional[Neo4jCredentials] = Neo4jCredentials(),
 ):
     """Return a list of Relationships from a Neo4j instance.

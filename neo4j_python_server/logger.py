@@ -8,3 +8,5 @@ formatter = logging.Formatter(
 )
 sh.setFormatter(formatter)
 logger.addHandler(sh)
+
+logger.setLevel(logging.DEBUG)
